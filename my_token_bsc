@@ -5,56 +5,31 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract RECYC is ERC20, Ownable {
-    uint256 public constant MAX_SUPPLY = 1000000000000 * (10 ** 18); // 1 триллион токенов
-    uint256 public burnRate = 2; // 2% от каждой транзакции сжигается
-    address public feeCollector; // Адрес для сбора комиссий
+    uint256 public constant MAX_SUPPLY = 1000000000000 * (10 ** 18); // 1 trillion tokens
+    uint256 public burnRate = 2; // 2% of each transaction is burned
+    address public feeCollector; // Address for collecting fees
 
     constructor(address _feeCollector) ERC20("RECYC Coin", "RECYC") {
         require(_feeCollector != address(0), "Fee collector address cannot be zero");
         feeCollector = _feeCollector;
 
-        // Начальная эмиссия: 100 миллионов токенов
+        // Initial mint: 100 million tokens
         _mint(msg.sender, 100000000 * (10 ** 18));
     }
 
-    // Установка адреса для сбора комиссий
+    // Set the address for fee collection
     function setFeeCollector(address _feeCollector) external onlyOwner {
         require(_feeCollector != address(0), "Fee collector address cannot be zero");
         feeCollector = _feeCollector;
     }
 
-    // Установка процента сжигания
+    // Set the burn rate percentage
     function setBurnRate(uint256 _burnRate) external onlyOwner {
         require(_burnRate <= 10, "Burn rate cannot exceed 10%");
         burnRate = _burnRate;
     }
 
-    // Перегрузка функции transfer с добавлением burn и fee
+    // Overriding the transfer function with added burn and fee logic
     function _transfer(address sender, address recipient, uint256 amount) internal override {
-        uint256 burnAmount = (amount * burnRate) / 100; // Вычисляем, сколько токенов сжечь
-        uint256 feeAmount = (amount * burnRate) / 100;  // Вычисляем комиссию
-
-        uint256 sendAmount = amount - burnAmount - feeAmount; // Остаток для отправки
-        require(sendAmount > 0, "Transfer amount too small");
-
-        // Сжигание токенов
-        _burn(sender, burnAmount);
-
-        // Отправка комиссии
-        super._transfer(sender, feeCollector, feeAmount);
-
-        // Отправка оставшихся токенов получателю
-        super._transfer(sender, recipient, sendAmount);
-    }
-
-    // Функция чеканки новых токенов (до максимального лимита)
-    function mint(address to, uint256 amount) external onlyOwner {
-        require(totalSupply() + amount <= MAX_SUPPLY, "Max supply exceeded");
-        _mint(to, amount);
-    }
-
-    // Функция сжигания токенов (для дефляции)
-    function burn(uint256 amount) external {
-        _burn(msg.sender, amount);
-    }
-}
+        uint256 burnAmount = (amount * burnRate) / 100; // Calculate how many tokens to burn
+        uint256 feeAmount = (amount * burnRate) / 100;  // Calculate the fee amo
