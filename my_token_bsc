@@ -5,42 +5,56 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract RECYC is ERC20, Ownable {
-    // Total supply: 1 trillion (1,000,000,000,000 tokens)
-    uint256 public constant MAX_SUPPLY = 1000000000000 * (10 ** 18); // 1 trillion tokens with 18 decimals
-    uint256 public constant INITIAL_SUPPLY = 50000000000 * (10 ** 18); // 5% of 1 trillion = 50 billion tokens
+    uint256 public constant MAX_SUPPLY = 1000000000000 * (10 ** 18); // 1 триллион токенов
+    uint256 public burnRate = 2; // 2% от каждой транзакции сжигается
+    address public feeCollector; // Адрес для сбора комиссий
 
-    // Contract address (where token will be deployed)
-    address public constant CONTRACT_ADDRESS = 0x4E119d367e97B4E7362900838f74f5364Cd96e78;
+    constructor(address _feeCollector) ERC20("RECYC Coin", "RECYC") {
+        require(_feeCollector != address(0), "Fee collector address cannot be zero");
+        feeCollector = _feeCollector;
 
-    constructor() ERC20("RECYC Token", "RECYC") {
-        // Initially mint 50 billion tokens
-        _mint(msg.sender, INITIAL_SUPPLY); // Initial 5% token issuance
+        // Начальная эмиссия: 100 миллионов токенов
+        _mint(msg.sender, 100000000 * (10 ** 18));
     }
 
-    // Function to mint additional tokens without exceeding the max supply
-    function mint(address to, uint256 amount) public onlyOwner {
-        require(totalSupply() + amount <= MAX_SUPPLY, "Cannot exceed maximum supply");
+    // Установка адреса для сбора комиссий
+    function setFeeCollector(address _feeCollector) external onlyOwner {
+        require(_feeCollector != address(0), "Fee collector address cannot be zero");
+        feeCollector = _feeCollector;
+    }
+
+    // Установка процента сжигания
+    function setBurnRate(uint256 _burnRate) external onlyOwner {
+        require(_burnRate <= 10, "Burn rate cannot exceed 10%");
+        burnRate = _burnRate;
+    }
+
+    // Перегрузка функции transfer с добавлением burn и fee
+    function _transfer(address sender, address recipient, uint256 amount) internal override {
+        uint256 burnAmount = (amount * burnRate) / 100; // Вычисляем, сколько токенов сжечь
+        uint256 feeAmount = (amount * burnRate) / 100;  // Вычисляем комиссию
+
+        uint256 sendAmount = amount - burnAmount - feeAmount; // Остаток для отправки
+        require(sendAmount > 0, "Transfer amount too small");
+
+        // Сжигание токенов
+        _burn(sender, burnAmount);
+
+        // Отправка комиссии
+        super._transfer(sender, feeCollector, feeAmount);
+
+        // Отправка оставшихся токенов получателю
+        super._transfer(sender, recipient, sendAmount);
+    }
+
+    // Функция чеканки новых токенов (до максимального лимита)
+    function mint(address to, uint256 amount) external onlyOwner {
+        require(totalSupply() + amount <= MAX_SUPPLY, "Max supply exceeded");
         _mint(to, amount);
     }
 
-    // Function to lock tokens in the contract (for future issuance, for example)
-    function lockTokens(address to, uint256 amount) public onlyOwner {
-        require(amount <= balanceOf(msg.sender), "Insufficient balance to lock");
-        _transfer(msg.sender, to, amount);
-    }
-
-    // Function to transfer contract ownership back to its address if needed
-    function transferContractOwnership() public onlyOwner {
-        transferOwnership(CONTRACT_ADDRESS);
-    }
-
-    // Additional function to check the total supply of tokens
-    function getTotalSupply() public view returns (uint256) {
-        return totalSupply();
-    }
-
-    // Function to burn tokens (reduce the supply)
-    function burn(uint256 amount) public onlyOwner {
+    // Функция сжигания токенов (для дефляции)
+    function burn(uint256 amount) external {
         _burn(msg.sender, amount);
     }
 }
