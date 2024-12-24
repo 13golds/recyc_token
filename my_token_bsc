@@ -32,4 +32,29 @@ contract RECYC is ERC20, Ownable {
     // Overriding the transfer function with added burn and fee logic
     function _transfer(address sender, address recipient, uint256 amount) internal override {
         uint256 burnAmount = (amount * burnRate) / 100; // Calculate how many tokens to burn
-        uint256 feeAmount = (amount * burnRate) / 100;  // Calculate the fee amo
+        uint256 feeAmount = (amount * burnRate) / 100;  // Calculate the fee amount
+
+        uint256 sendAmount = amount - burnAmount - feeAmount; // Remaining amount to send
+        require(sendAmount > 0, "Transfer amount too small");
+
+        // Burning tokens
+        _burn(sender, burnAmount);
+
+        // Sending fee to the fee collector
+        super._transfer(sender, feeCollector, feeAmount);
+
+        // Sending the remaining tokens to the recipient
+        super._transfer(sender, recipient, sendAmount);
+    }
+
+    // Mint new tokens (up to the max supply limit)
+    function mint(address to, uint256 amount) external onlyOwner {
+        require(totalSupply() + amount <= MAX_SUPPLY, "Max supply exceeded");
+        _mint(to, amount);
+    }
+
+    // Burn tokens (for deflationary purpose)
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
+    }
+}
