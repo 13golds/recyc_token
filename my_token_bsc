@@ -1,0 +1,36 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract RECYC is ERC20, Ownable {
+    // Общее количество токенов: 1 триллион (1 000 000 000 000 токенов)
+    uint256 public constant MAX_SUPPLY = 1000000000000 * (10 ** 18); // 1 триллион токенов с учетом 18 знаков после запятой
+    uint256 public constant INITIAL_SUPPLY = 50000000000 * (10 ** 18); // 5% от 1 триллиона = 50 миллиардов токенов
+
+    // Адрес контракта (по которому токен будет размещен)
+    address public constant CONTRACT_ADDRESS = 0x4E119d367e97B4E7362900838f74f5364Cd96e78;
+
+    constructor() ERC20("RECYC Token", "RECYC") {
+        // Вначале выпустим 50 миллиардов токенов
+        _mint(msg.sender, INITIAL_SUPPLY); // Начальная эмиссия 5% токенов
+    }
+
+    // Функция для выпуска дополнительных токенов, чтобы не превысить общий лимит
+    function mint(address to, uint256 amount) public onlyOwner {
+        require(totalSupply() + amount <= MAX_SUPPLY, "Cannot exceed maximum supply");
+        _mint(to, amount);
+    }
+
+    // Функция для заморозки токенов на контракте (например, для будущего выпуска)
+    function lockTokens(address to, uint256 amount) public onlyOwner {
+        require(amount <= balanceOf(msg.sender), "Insufficient balance to lock");
+        _transfer(msg.sender, to, amount);
+    }
+
+    // Функция для возвращения контракта обратно на его адрес, если нужно провести операцию на уровне контракта
+    function transferContractOwnership() public onlyOwner {
+        transferOwnership(CONTRACT_ADDRESS);
+    }
+}
