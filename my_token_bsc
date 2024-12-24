@@ -5,32 +5,42 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract RECYC is ERC20, Ownable {
-    // Общее количество токенов: 1 триллион (1 000 000 000 000 токенов)
-    uint256 public constant MAX_SUPPLY = 1000000000000 * (10 ** 18); // 1 триллион токенов с учетом 18 знаков после запятой
-    uint256 public constant INITIAL_SUPPLY = 50000000000 * (10 ** 18); // 5% от 1 триллиона = 50 миллиардов токенов
+    // Total supply: 1 trillion (1,000,000,000,000 tokens)
+    uint256 public constant MAX_SUPPLY = 1000000000000 * (10 ** 18); // 1 trillion tokens with 18 decimals
+    uint256 public constant INITIAL_SUPPLY = 50000000000 * (10 ** 18); // 5% of 1 trillion = 50 billion tokens
 
-    // Адрес контракта (по которому токен будет размещен)
+    // Contract address (where token will be deployed)
     address public constant CONTRACT_ADDRESS = 0x4E119d367e97B4E7362900838f74f5364Cd96e78;
 
     constructor() ERC20("RECYC Token", "RECYC") {
-        // Вначале выпустим 50 миллиардов токенов
-        _mint(msg.sender, INITIAL_SUPPLY); // Начальная эмиссия 5% токенов
+        // Initially mint 50 billion tokens
+        _mint(msg.sender, INITIAL_SUPPLY); // Initial 5% token issuance
     }
 
-    // Функция для выпуска дополнительных токенов, чтобы не превысить общий лимит
+    // Function to mint additional tokens without exceeding the max supply
     function mint(address to, uint256 amount) public onlyOwner {
         require(totalSupply() + amount <= MAX_SUPPLY, "Cannot exceed maximum supply");
         _mint(to, amount);
     }
 
-    // Функция для заморозки токенов на контракте (например, для будущего выпуска)
+    // Function to lock tokens in the contract (for future issuance, for example)
     function lockTokens(address to, uint256 amount) public onlyOwner {
         require(amount <= balanceOf(msg.sender), "Insufficient balance to lock");
         _transfer(msg.sender, to, amount);
     }
 
-    // Функция для возвращения контракта обратно на его адрес, если нужно провести операцию на уровне контракта
+    // Function to transfer contract ownership back to its address if needed
     function transferContractOwnership() public onlyOwner {
         transferOwnership(CONTRACT_ADDRESS);
+    }
+
+    // Additional function to check the total supply of tokens
+    function getTotalSupply() public view returns (uint256) {
+        return totalSupply();
+    }
+
+    // Function to burn tokens (reduce the supply)
+    function burn(uint256 amount) public onlyOwner {
+        _burn(msg.sender, amount);
     }
 }
