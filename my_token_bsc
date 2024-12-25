@@ -4,57 +4,75 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract RECYC is ERC20, Ownable {
-    uint256 public constant MAX_SUPPLY = 1000000000000 * (10 ** 18); // 1 trillion tokens
-    uint256 public burnRate = 2; // 2% of each transaction is burned
-    address public feeCollector; // Address for collecting fees
+contract RecycToken is ERC20, Ownable {
 
-    constructor(address _feeCollector) ERC20("RECYC Coin", "RECYC") {
-        require(_feeCollector != address(0), "Fee collector address cannot be zero");
-        feeCollector = _feeCollector;
+    uint256 public maxSupply = 1000000000000 * (10 ** uint256(decimals())); // Maximum token supply
+    uint256 public reserveSupply = 50000000000 * (10 ** uint256(decimals())); // Reserved supply
 
-        // Initial mint: 100 million tokens
-        _mint(msg.sender, 100000000 * (10 ** 18));
+    uint256 public transactionFeePercentage = 0; // Transaction fee in percentage
+    address public liquidityPool; // Liquidity pool address
+
+    // Addresses for percentage allocation
+    address public partnershipResource;
+    address public factoryReserve;
+    address public generalReserve;
+
+    // Percentages for allocation
+    uint256 public constant PARTNERSHIP_PERCENTAGE = 40; // 40% to partnership
+    uint256 public constant FACTORY_PERCENTAGE = 30;     // 30% to factories
+    uint256 public constant GENERAL_PERCENTAGE = 20;     // 20% to general reserve
+    uint256 public constant POOL_PERCENTAGE = 5;         // 5% to liquidity pool
+
+    constructor(
+        address _partnershipResource,
+        address _factoryReserve,
+        address _generalReserve
+    ) ERC20("Recyc", "RECYC") {
+        require(
+            _partnershipResource != address(0) &&
+            _factoryReserve != address(0) &&
+            _generalReserve != address(0),
+            "Addresses cannot be zero"
+        );
+
+        partnershipResource = _partnershipResource;
+        factoryReserve = _factoryReserve;
+        generalReserve = _generalReserve;
+
+        _mint(msg.sender, maxSupply - reserveSupply);
+        liquidityPool = msg.sender;
     }
 
-    // Set the address for fee collection
-    function setFeeCollector(address _feeCollector) external onlyOwner {
-        require(_feeCollector != address(0), "Fee collector address cannot be zero");
-        feeCollector = _feeCollector;
+    function setTransactionFee(uint256 _feePercentage) external onlyOwner {
+        require(_feePercentage >= 0.5 && _feePercentage <= 5, "Fee must be between 0.5% and 5%");
+        transactionFeePercentage = _feePercentage;
     }
 
-    // Set the burn rate percentage
-    function setBurnRate(uint256 _burnRate) external onlyOwner {
-        require(_burnRate <= 10, "Burn rate cannot exceed 10%");
-        burnRate = _burnRate;
-    }
+    function _transfer(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) internal override {
+        if (transactionFeePercentage > 0) {
+            uint256 fee = (amount * transactionFeePercentage) / 100; // Calculate fee
+            uint256 amountAfterFee = amount - fee;
 
-    // Overriding the transfer function with added burn and fee logic
-    function _transfer(address sender, address recipient, uint256 amount) internal override {
-        uint256 burnAmount = (amount * burnRate) / 100; // Calculate how many tokens to burn
-        uint256 feeAmount = (amount * burnRate) / 100;  // Calculate the fee amount
+            // Split the fee
+            uint256 partnershipAmount = (fee * PARTNERSHIP_PERCENTAGE) / 100;
+            uint256 factoryAmount = (fee * FACTORY_PERCENTAGE) / 100;
+            uint256 generalAmount = (fee * GENERAL_PERCENTAGE) / 100;
+            uint256 poolAmount = (fee * POOL_PERCENTAGE) / 100;
 
-        uint256 sendAmount = amount - burnAmount - feeAmount; // Remaining amount to send
-        require(sendAmount > 0, "Transfer amount too small");
+            // Transfer fee to respective wallets
+            super._transfer(sender, partnershipResource, partnershipAmount);
+            super._transfer(sender, factoryReserve, factoryAmount);
+            super._transfer(sender, generalReserve, generalAmount);
+            super._transfer(sender, liquidityPool, poolAmount);
 
-        // Burning tokens
-        _burn(sender, burnAmount);
-
-        // Sending fee to the fee collector
-        super._transfer(sender, feeCollector, feeAmount);
-
-        // Sending the remaining tokens to the recipient
-        super._transfer(sender, recipient, sendAmount);
-    }
-
-    // Mint new tokens (up to the max supply limit)
-    function mint(address to, uint256 amount) external onlyOwner {
-        require(totalSupply() + amount <= MAX_SUPPLY, "Max supply exceeded");
-        _mint(to, amount);
-    }
-
-    // Burn tokens (for deflationary purpose)
-    function burn(uint256 amount) external {
-        _burn(msg.sender, amount);
+            // Transfer the remaining tokens to the recipient
+            super._transfer(sender, recipient, amountAfterFee);
+        } else {
+            super._transfer(sender, recipient, amount);
+        }
     }
 }
